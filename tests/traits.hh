@@ -1,7 +1,7 @@
 #pragma once
 
 namespace json::testing {
-#if HAS_JSON_EXCEPTIONS
+#if HAS_JSON_EXCEPTIONS && HAS_JSON_VT
 	template <value_type TYPE> struct bad_cast_exception;
 	template <value_type TYPE> using bad_cast_exception_t = typename bad_cast_exception<TYPE>::type;
 	template <> struct bad_cast_exception<JSON_NUMBER> { using type = not_a_number; };
@@ -17,6 +17,7 @@ namespace json::testing {
 	template <> struct is_int<int> : std::true_type {};
 	template <> struct is_int<short> : std::true_type {};
 
+#if HAS_JSON_VT
 	template <value_type TYPE>
 	using vtid = std::integral_constant<value_type, TYPE>;
 	template <typename Arg, typename = void> struct type_to_vt;
@@ -25,4 +26,5 @@ namespace json::testing {
 	template <> struct type_to_vt<std::string> : vtid<JSON_STRING> {};
 	template <> struct type_to_vt<std::vector<value>> : vtid<JSON_ARRAY> {};
 	template <typename Int> struct type_to_vt<Int, std::enable_if_t<is_int_v<Int>>> : vtid<JSON_NUMBER> {};
+#endif
 }

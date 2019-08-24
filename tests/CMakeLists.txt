@@ -19,6 +19,9 @@ set(HAS_JSON_VALUE        NO)
 # Do you provide the "rule-of-5" constructors and the conversion constructors?
 set(HAS_JSON_CTORS        NO)
 
+# Does your class support val.get_type()?
+set(HAS_JSON_GET_TYPE     NO)
+
 # Does your class support val.is<JSON_NUMBER>(), etc.?
 set(HAS_JSON_IS_VT        NO)
 
@@ -60,17 +63,18 @@ message(STATUS " has-exceptions        | ${HAS_JSON_EXCEPTIONS}")
 message(STATUS " value_type            | ${HAS_JSON_VT}")
 message(STATUS " value                 | ${HAS_JSON_VALUE}")
 message(STATUS " value ctors           | ${HAS_JSON_CTORS}")
+message(STATUS " val.get_type()        | ${HAS_JSON_GET_TYPE}")
 message(STATUS " val.is<JSON_NUMBER>() | ${HAS_JSON_IS_VT}")
 message(STATUS " val.is<long long>()   | ${HAS_JSON_IS_CLASS}")
 message(STATUS " val.as_number()       | ${HAS_JSON_AS_DIRECT}")
 message(STATUS " val.as<JSON_NUMBER>() | ${HAS_JSON_AS_VT}")
 message(STATUS " val.as<int>()         | ${HAS_JSON_AS_CLASS}")
 message(STATUS " json::parse()         | ${HAS_JSON_PARSER}")
-message(STATUS " json::parse() [NULL]  | ${HAS_JSON_PARSER_NULL}")
-message(STATUS " json::parse() [NUM]   | ${HAS_JSON_PARSER_NUM}")
-message(STATUS " json::parse() [STR]   | ${HAS_JSON_PARSER_STR}")
-message(STATUS " json::parse() [ARRAY] | ${HAS_JSON_PARSER_ARRAY}")
-message(STATUS " json::parse() [EMPTY] | ${HAS_JSON_PARSER_EMPTY}")
+message(STATUS " json::parse()[NULL]   | ${HAS_JSON_PARSER_NULL}")
+message(STATUS " json::parse()[NUM]    | ${HAS_JSON_PARSER_NUM}")
+message(STATUS " json::parse()[STRING] | ${HAS_JSON_PARSER_STR}")
+message(STATUS " json::parse()[ARRAY]  | ${HAS_JSON_PARSER_ARRAY}")
+message(STATUS " json::parse()[EMPTY]  | ${HAS_JSON_PARSER_EMPTY}")
 message(STATUS "-----------------------+-------")
 
 set(TEST_SOURCES

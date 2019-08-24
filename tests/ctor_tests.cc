@@ -4,11 +4,12 @@
 #include "io.hh"
 #include "traits.hh"
 
-#if HAS_JSON_AS_DIRECT && HAS_JSON_GET_TYPE
+#if HAS_JSON_CTORS
 
 namespace json::testing {
-	class JsonConstructor : public ::testing::Test {
+	class Ctor : public ::testing::Test {
 	public:
+#if HAS_JSON_AS_DIRECT && HAS_JSON_GET_TYPE
 		template <typename Tested>
 		void simple_test(value_type VT, value const& val, Tested const& expected) {
 			EXPECT_EQ(VT, val.get_type());
@@ -35,14 +36,105 @@ namespace json::testing {
 		void simple_test(value_type VT, Tested const& expected) {
 			simple_test(VT, expected, expected);
 		}
+#endif // HAS_JSON_AS_DIRECT && HAS_JSON_GET_TYPE
 	};
 
-	TEST_F(JsonConstructor, Null) {
+	TEST_F(Ctor, Null_NoCompare) {
+		value a{};
+		value b{ nullptr };
+	}
+
+	TEST_F(Ctor, Number_NoCompare) {
+		value a{ 0ll };
+		value b{ -1 };
+		value c{ 1 };
+		value d{ std::numeric_limits<long long>::max() };
+		value e{ std::numeric_limits<long long>::min() };
+	}
+
+	TEST_F(Ctor, String_NoCompare) {
+		using namespace std::literals;
+
+		value a{ "" };
+		value b{ std::string{} };
+		value c{ "fee fi fo" };
+		value d{ "fee fi fo"s };
+	}
+
+	TEST_F(Ctor, Array_NoCompare) {
+		using namespace std::literals;
+
+		value a{ array{} };
+		value b{ { array{}, array{}, array{} } };
+		value c{ { array{}, 5, {}, nullptr, "fee"s, "fi"s, "fo" } };
+		value d{ { array{}, 5, {}, nullptr, "fee"s, "fi"s, "fo" } };
+	}
+
+	TEST_F(Ctor, Copy_NoCompare) {
+		using namespace std::literals;
+
+		value null{};
+		value number{ 42 };
+		value string{ "fee fi fo"s };
+		value arr{ { null, number, string } };
+
+		value a{ null };
+		value b{ number };
+		value c{ string };
+		value d{ arr };
+	}
+
+	TEST_F(Ctor, Move_NoCompare) {
+		using namespace std::literals;
+
+		value null{};
+		value number{ 42 };
+		value string{ "fee fi fo"s };
+		value arr{ { null, number, string } };
+
+		value a{ std::move(null) };
+		value b{ std::move(number) };
+		value c{ std::move(string) };
+		value d{ std::move(arr) };
+	}
+
+	TEST_F(Ctor, CopyAssign_NoCompare) {
+		using namespace std::literals;
+
+		value val{};
+		value null{};
+		value number{ 42 };
+		value string{ "fee fi fo"s };
+		value arr{ { null, number, string } };
+
+		val = null;
+		val = number;
+		val = string;
+		val = arr;
+	}
+
+	TEST_F(Ctor, MoveAssign_NoCompare) {
+		using namespace std::literals;
+
+		value val{};
+		value null{};
+		value number{ 42 };
+		value string{ "fee fi fo"s };
+		value arr{ { null, number, string } };
+
+		val = std::move(null);
+		val = std::move(number);
+		val = std::move(string);
+		val = std::move(arr);
+	}
+
+#if HAS_JSON_AS_DIRECT && HAS_JSON_GET_TYPE
+	TEST_F(Ctor, Null) {
 		simple_test(JSON_NULL, {}, nullptr);
 		simple_test(JSON_NULL, nullptr);
 	}
 
-	TEST_F(JsonConstructor, Number) {
+	TEST_F(Ctor, Number) {
 		simple_test(JSON_NUMBER, 0);
 		simple_test(JSON_NUMBER, -1);
 		simple_test(JSON_NUMBER, 1);
@@ -50,7 +142,7 @@ namespace json::testing {
 		simple_test(JSON_NUMBER, std::numeric_limits<long long>::min());
 	}
 
-	TEST_F(JsonConstructor, String) {
+	TEST_F(Ctor, String) {
 		using namespace std::literals;
 
 		simple_test(JSON_STRING, "");
@@ -59,7 +151,7 @@ namespace json::testing {
 		simple_test(JSON_STRING, "fee fi fo"s);
 	}
 
-	TEST_F(JsonConstructor, Array) {
+	TEST_F(Ctor, Array) {
 		using namespace std::literals;
 
 		simple_test(JSON_ARRAY, array{});
@@ -68,7 +160,7 @@ namespace json::testing {
 		simple_test(JSON_ARRAY, { { array{}, 5, {}, nullptr, "fee"s, "fi"s, "fo" } }, array{ { array{}, 5, {}, nullptr, "fee"s, "fi"s, "fo" } });
 	}
 
-	TEST_F(JsonConstructor, Copy) {
+	TEST_F(Ctor, Copy) {
 		using namespace std::literals;
 
 		value null{};
@@ -87,7 +179,7 @@ namespace json::testing {
 		EXPECT_EQ(3, arr.as_array().size());
 	}
 
-	TEST_F(JsonConstructor, Move) {
+	TEST_F(Ctor, Move) {
 		using namespace std::literals;
 
 		value null{};
@@ -114,7 +206,7 @@ namespace json::testing {
 		EXPECT_TRUE(arr.as_array().empty());
 	}
 
-	TEST_F(JsonConstructor, CopyAssign) {
+	TEST_F(Ctor, CopyAssign) {
 		using namespace std::literals;
 
 		value val{};
@@ -157,7 +249,7 @@ namespace json::testing {
 		EXPECT_EQ(items, arr);
 	}
 
-	TEST_F(JsonConstructor, MoveAssign) {
+	TEST_F(Ctor, MoveAssign) {
 		using namespace std::literals;
 
 		value val{};
@@ -198,6 +290,6 @@ namespace json::testing {
 		EXPECT_EQ(""s, string);
 		EXPECT_EQ(array{}, arr);
 	}
-}
-
 #endif // HAS_JSON_AS_DIRECT && HAS_JSON_GET_TYPE
+}
+#endif // HAS_JSON_CTORS

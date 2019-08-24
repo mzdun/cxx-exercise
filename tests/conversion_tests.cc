@@ -8,34 +8,68 @@ namespace json::testing {
 #if HAS_JSON_EXCEPTIONS && HAS_JSON_VT && HAS_JSON_VALUE
 	using namespace std::literals;
 
-	struct JsonConversion : ::testing::Test {
-		template <value_type ExpectedType, value_type CurrentType, value_type ... Types>
-		void cast_tests([[maybe_unused]] value const& val) {
+	struct ConversionBase : ::testing::Test {
+#if HAS_JSON_GET_TYPE
+		template <value_type ExpectedType>
+		void get_type(value const& val) {
+			EXPECT_EQ(ExpectedType, val.get_type()); // sanity check
+		}
+#endif // HAS_JSON_GET_TYPE
+
 #if HAS_JSON_IS_VT
+		template <value_type ExpectedType, value_type CurrentType, value_type ... Types>
+		void is_vt_tests(value const& val) {
 			EXPECT_EQ(ExpectedType == CurrentType, val.is<CurrentType>());
+			if constexpr (sizeof...(Types) > 0)
+				is_vt_tests<ExpectedType, Types...>(val);
+		}
+
+		template <value_type ExpectedType>
+		void checking_vt(value const& val) {
+			is_vt_tests<ExpectedType, JSON_NUMBER, JSON_STRING, JSON_ARRAY>(val);
+		}
+#endif // HAS_JSON_IS_VT
+
+#if HAS_JSON_IS_CLASS
+		template <value_type ExpectedType, typename CurrentType, typename ... FurtherTypes>
+		void is_class_tests(value const& val) {
+			constexpr auto ActualType = type_to_vt_v<CurrentType>;
+			EXPECT_EQ(ExpectedType == ActualType, val.is<CurrentType>());
+
+			if constexpr (sizeof...(FurtherTypes) > 0)
+				is_class_tests<ExpectedType, FurtherTypes...>(val);
+		}
+
+		template <value_type ExpectedType>
+		void checking_class(value const& val) {
+			is_class_tests<ExpectedType, long long, long, int, short, std::string, json::array>(val);
+		}
 #endif // HAS_JSON_IS_VT
 
 #if HAS_JSON_AS_VT
+		template <value_type ExpectedType, value_type CurrentType, value_type ... Types>
+		void as_vt_tests(value const& val) {
 			if constexpr (ExpectedType == CurrentType) {
 				EXPECT_NO_THROW(val.as<CurrentType>()) << " Type is: " << ValueType{ CurrentType };
 			} else {
 				EXPECT_THROW(val.as<CurrentType>(), bad_cast_exception_t<CurrentType>) << " Type is: " << ValueType{ CurrentType };
 			}
-#endif // HAS_JSON_AS_VT
 
 			if constexpr (sizeof...(Types) > 0)
-				cast_tests<ExpectedType, Types...>(val);
+				as_vt_tests<ExpectedType, Types...>(val);
 		}
 
-		template <value_type ExpectedType, typename CurrentType, typename ... FurtherTypes>
-		void type_cast_tests([[maybe_unused]] value const& val) {
-			[[maybe_unused]] constexpr auto ActualType = type_to_vt_v<CurrentType>;
-
-#if HAS_JSON_IS_CLASS
-			EXPECT_EQ(ExpectedType == ActualType, val.is<CurrentType>());
-#endif // HAS_JSON_IS_VT
+		template <value_type ExpectedType>
+		void casting_vt(value const& val) {
+			as_vt_tests<ExpectedType, JSON_NUMBER, JSON_STRING, JSON_ARRAY>(val);
+		}
+#endif // HAS_JSON_AS_VT
 
 #if HAS_JSON_AS_CLASS
+		template <value_type ExpectedType, typename CurrentType, typename ... FurtherTypes>
+		void as_class_tests(value const& val) {
+			constexpr auto ActualType = type_to_vt_v<CurrentType>;
+
 			if constexpr (ExpectedType == ActualType) {
 				EXPECT_NO_THROW(val.as<CurrentType>())
 					<< " Type is: " << ActualTypeTag<CurrentType>{};
@@ -43,46 +77,121 @@ namespace json::testing {
 				EXPECT_THROW(val.as<CurrentType>(), bad_cast_exception_t<ActualType>)
 					<< " Type is: " << ActualTypeTag<CurrentType>{};
 			}
-#endif // HAS_JSON_AS_CLASS
 
 			if constexpr (sizeof...(FurtherTypes) > 0)
-				type_cast_tests<ExpectedType, FurtherTypes...>(val);
+				as_class_tests<ExpectedType, FurtherTypes...>(val);
 		}
 
 		template <value_type ExpectedType>
-		void casting(value const& val) {
-#if HAS_JSON_GET_TYPE
-			EXPECT_EQ(ExpectedType, val.get_type()); // sanity check
-#endif // HAS_JSON_GET_TYPE
-			cast_tests<ExpectedType, JSON_NUMBER, JSON_STRING, JSON_ARRAY>(val);
-			type_cast_tests<ExpectedType, long long, long, int, short, std::string
-#if HAS_JSON_VT && HAS_JSON_VALUE
-				, json::array
-#endif
-			>(val);
+		void casting_class(value const& val) {
+			as_class_tests<ExpectedType, long long, long, int, short, std::string, json::array>(val);
 		}
+#endif // HAS_JSON_AS_CLASS
 	};
 
-#define CASTING_TEST_MAKES_SENSE (HAS_JSON_CTORS && (HAS_JSON_GET_TYPE || HAS_JSON_IS_VT || HAS_JSON_AS_VT || HAS_JSON_IS_CLASS || HAS_JSON_AS_CLASS))
-#if CASTING_TEST_MAKES_SENSE
-	TEST_F(JsonConversion, FromNull) {
-		casting<JSON_NULL>(nullptr);
+#if HAS_JSON_GET_TYPE
+	struct GetType_SanityCheck {
+		template <value_type ExpectedType>
+		static void test(ConversionBase* self, value const& val) {
+			self->get_type<ExpectedType>(val);
+		}
+	};
+#endif
+
+#if HAS_JSON_AS_VT
+	struct AsValueType {
+		template <value_type ExpectedType>
+		static void test(ConversionBase* self, value const& val) {
+			self->casting_vt<ExpectedType>(val);
+		}
+	};
+#endif
+
+#if HAS_JSON_AS_CLASS
+	struct AsClass {
+		template <value_type ExpectedType>
+		static void test(ConversionBase* self, value const& val) {
+			self->casting_class<ExpectedType>(val);
+		}
+	};
+#endif
+
+#if HAS_JSON_IS_VT
+	struct IsValueType {
+		template <value_type ExpectedType>
+		static void test(ConversionBase* self, value const& val) {
+			self->checking_vt<ExpectedType>(val);
+		}
+	};
+#endif
+
+#if HAS_JSON_IS_CLASS
+	struct IsClass {
+		template <value_type ExpectedType>
+		static void test(ConversionBase* self, value const& val) {
+			self->checking_class<ExpectedType>(val);
+		}
+	};
+#endif
+
+	template <typename Checker>
+	struct Conversion : ConversionBase {
+		using checker_t = Checker;
+	};
+
+	TYPED_TEST_SUITE_P(Conversion);
+
+	TYPED_TEST_P(Conversion, Null) {
+		using CurrentTest = std::remove_reference_t<std::remove_cv_t<decltype(*this)>>;
+		using checker = typename CurrentTest::checker_t;
+		checker::template test<JSON_NULL>(this, nullptr);
 	}
 
-	TEST_F(JsonConversion, FromInt) {
-		casting<JSON_NUMBER>(0ll);
-		casting<JSON_NUMBER>(42);
+	TYPED_TEST_P(Conversion, Int) {
+		using CurrentTest = std::remove_reference_t<std::remove_cv_t<decltype(*this)>>;
+		using checker = typename CurrentTest::checker_t;
+		checker::template test<JSON_NUMBER>(this, 0ll);
+		checker::template test<JSON_NUMBER>(this, 42);
 	}
 
-	TEST_F(JsonConversion, FromString) {
-		casting<JSON_STRING>("fee fi fo"s);
+	TYPED_TEST_P(Conversion, String) {
+		using CurrentTest = std::remove_reference_t<std::remove_cv_t<decltype(*this)>>;
+		using checker = typename CurrentTest::checker_t;
+		checker::template test<JSON_STRING>(this, "fee fi fo"s);
 	}
 
-	TEST_F(JsonConversion, FromArray) {
-		casting<JSON_ARRAY>(array{});
-		casting<JSON_ARRAY>(array{ "fee fi fo"s, 5, {} });
+	TYPED_TEST_P(Conversion, Array) {
+		using CurrentTest = std::remove_reference_t<std::remove_cv_t<decltype(*this)>>;
+		using checker = typename CurrentTest::checker_t;
+		checker::template test<JSON_ARRAY>(this, array{});
+		checker::template test<JSON_ARRAY>(this, array{ "fee fi fo"s, 5, {} });
 	}
-#endif // CASTING_TEST_MAKES_SENSE
+
+	REGISTER_TYPED_TEST_SUITE_P(Conversion,
+		Null, Int, String, Array);
+
+
+	template <size_t IgnoreJustAllowComma, typename... Classes>
+	using Types = ::testing::Types<Classes...>;
+
+	using Checkers = Types<0
+#if HAS_JSON_GET_TYPE
+		, GetType_SanityCheck
+#endif
+#if HAS_JSON_IS_VT
+		, IsValueType
+#endif
+#if HAS_JSON_IS_CLASS
+		, IsClass
+#endif
+#if HAS_JSON_AS_VT
+		, AsValueType
+#endif
+#if HAS_JSON_AS_CLASS
+		, AsClass
+#endif
+	>;
+	INSTANTIATE_TYPED_TEST_SUITE_P(Checkers, Conversion, Checkers);
 #endif // HAS_JSON_EXCEPTIONS
 
 #if HAS_JSON_VALUE && HAS_JSON_AS_DIRECT

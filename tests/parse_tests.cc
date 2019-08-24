@@ -34,14 +34,11 @@ namespace json::testing {
 	};
 
 #if HAS_JSON_EXCEPTIONS
-#if HAS_JSON_AS_DIRECT
-	class JsonParseGood : public ::testing::TestWithParam<parsing_result> {};
-#endif // HAS_JSON_AS_DIRECT
+	class Good : public ::testing::TestWithParam<parsing_result> {};
 
-	class JsonParseBad : public ::testing::TestWithParam<json_text> {};
+	class Bad : public ::testing::TestWithParam<json_text> {};
 
-#if HAS_JSON_AS_DIRECT
-	TEST_P(JsonParseGood, Parse) {
+	TEST_P(Good, Parse) {
 		auto const& param = GetParam();
 		EXPECT_NO_THROW(parse(param.text.data(), param.text.size()));
 		try {
@@ -51,14 +48,13 @@ namespace json::testing {
 			// ... filter failures already reported by EXPECT_NO_THROW
 		}
 	}
-#endif // HAS_JSON_AS_DIRECT
 
 #if HAS_JSON_PARSER_EMPTY
-	TEST_F(JsonParseBad, Empty) {
+	TEST_F(Bad, Empty) {
 		EXPECT_THROW(parse(""), empty_document);
 	}
 
-	TEST_F(JsonParseBad, WhitespacesOnly) {
+	TEST_F(Bad, WhitespacesOnly) {
 		EXPECT_THROW(parse(R"(  
 
 
@@ -71,18 +67,20 @@ namespace json::testing {
 	}
 #endif
 
-	TEST_P(JsonParseBad, Parse) {
+	TEST_P(Bad, Parse) {
 		auto const& param = GetParam();
 		EXPECT_THROW(parse(param.text.data(), param.text.size()), parser_error);
 	}
 
-#define HAS_JSON_PARSER_ANY_GOOD (\
+#define HAS_JSON_PARSER_ANY (\
 	HAS_JSON_PARSER_NULL || \
 	HAS_JSON_PARSER_STR || \
 	HAS_JSON_PARSER_NUM || \
 	HAS_JSON_PARSER_ARRAY)
 
-#if HAS_JSON_AS_DIRECT && HAS_JSON_PARSER_ANY_GOOD
+#define HAS_JSON_EQUALITY_COMP (HAS_JSON_AS_DIRECT && HAS_JSON_GET_TYPE)
+
+#if HAS_JSON_EQUALITY_COMP && HAS_JSON_PARSER_ANY
 	static parsing_result good_tests[] = {
 #if HAS_JSON_PARSER_NULL
 		{ "null"sv, {} },
@@ -111,7 +109,7 @@ namespace json::testing {
 #endif // HAS_JSON_PARSER_ARRAY
 	};
 
-	INSTANTIATE_TEST_SUITE_P(Data, JsonParseGood, ::testing::ValuesIn(good_tests));
+	INSTANTIATE_TEST_SUITE_P(Data, Good, ::testing::ValuesIn(good_tests));
 #endif
 
 	static constexpr json_text full_json[] = {
@@ -124,7 +122,7 @@ namespace json::testing {
 		"123E-2"sv
 	};
 
-	INSTANTIATE_TEST_SUITE_P(Full, JsonParseBad, ::testing::ValuesIn(full_json));
+	INSTANTIATE_TEST_SUITE_P(FullJSON, Bad, ::testing::ValuesIn(full_json));
 
 	static constexpr json_text bad_tests[] = {
 		"true, false"sv,
@@ -132,6 +130,8 @@ namespace json::testing {
 		R"([1234, null, )"sv,
 		R"([1234 / null])"sv,
 		R"("unfinished)"sv,
+		"\"new\nline\""sv,
+		"\"carriage\rreturn\""sv,
 		"nul"sv,
 		"+1234"sv,
 		"123a456"sv,
@@ -143,7 +143,7 @@ namespace json::testing {
 		"+[]"sv
 	};
 
-	INSTANTIATE_TEST_SUITE_P(Data, JsonParseBad, ::testing::ValuesIn(bad_tests));
+	INSTANTIATE_TEST_SUITE_P(Data, Bad, ::testing::ValuesIn(bad_tests));
 #endif // HAS_JSON_EXCEPTIONS
 }
 
