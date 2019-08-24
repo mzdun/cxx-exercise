@@ -1,0 +1,624 @@
+<pre class='metadata'>
+Title: Simplified JSON Exercise
+Shortname: json
+Level: 1
+Status: DREAM
+Group: wg21
+URL: https://api.csswg.org/bikeshed/?force=1&url=https://raw.githubusercontent.com/mzdun/cxx-exercise/master/docs/spec.bs
+Editor: Marcin Zdun, SRPOL, m.zdun@samsung.com
+Markup Shorthands: markdown yes
+Abstract: Your task is to write a parser for a simplified JSON.
+Abstract: For this, you need the C++ type representing the JSON value and the parser itself.
+Abstract: To help you with the task, this "specification" defines the JSON and the minimum C++ interfaces
+Abstract: needed to use the values and to check, if the parser works.
+</pre>
+
+<div class='note'>
+Just as this is an C++ exercise for you, this document is a Bikeshed exercise for me. If it is in any way overwhelming, come talk to me.
+</div>
+
+<!--
+████ ██    ██ ████████ ████████   ███████ 
+ ██  ███   ██    ██    ██     ██ ██     ██
+ ██  ████  ██    ██    ██     ██ ██     ██
+ ██  ██ ██ ██    ██    ████████  ██     ██
+ ██  ██  ████    ██    ██   ██   ██     ██
+ ██  ██   ███    ██    ██    ██  ██     ██
+████ ██    ██    ██    ██     ██  ███████ 
+-->
+
+# Intro # {#solution}
+
+The solution should consists of your proposition for the parser and the type, but it also should contain enough build system information to be easily built by me. For additional information, please see the [Categories](#categories) section.
+
+The main target to be built should be a library called `json`. If you used some sort of testing and needed a `main()` function, please put it in a separate file/separate project, so I could easily remove it when building your solution.
+
+<div class=note>
+The idea of "library called `json`" differs between various systems. On Linux it means a static library called `libjson.a`, on Windows it means a static library called `json.lib`. Still, the build system for Linux is enough.
+</div>
+
+<div class=example>
+CMake building `libjson` and private driver:
+
+```cmake
+add_library(json ${LIBRARY_SOURCES})
+target_include_directories(json PUBLIC ${CMAKE_SOURCE_DIR}/lib/include)
+add_executable(json_driver file_with_main.cpp)
+target_link_libraries(json_driver json)
+```
+</div>
+
+<div class=example>
+Makefile building `libjson` and private driver:
+
+```make
+libjson.a: $(LIBRARY_OBJECTS)
+  @ar rcs $@ $^
+
+driver: libjson.a file_with_main.o
+  @$(CXX) $^ -o $@
+```
+</div>
+
+<!-- ============================================================================== -->
+
+## Categories ## {#categories}
+
+Authors of the solutions should choose one of the categories listed below and specify that as part of the solution in some way. You could leave a comment in the header file or specify a C++ dialect in the build system files (`Makefile` or `CMakeLists.txt`).
+
+: Masochistic
+:: Only C++11 is allowed. The spec was a breakthrough on its own, but the next versions expanded on it in ways, which made C++11 hard to use
+:: Build system should be configured to use *-std=c++11* dialect switch. If targeting Windows, just leave a comment in a header and practice self-control :)
+: Realistic
+:: C++14 is allowed. This means `auto` functions, generic lambdas and variable templates, as well as some fixes in the standard library.
+:: Build system should be configured to use *-std=c++14* dialect switch. If targeting Windows, just leave a comment in a header.
+: Futuristic
+:: Free to use any dialect above C++14, with their language features and libraries.
+:: Build system should be configured to use *-std=c++17*, *-std=c++2a* or *-std=c++20* dialect switch for GCC/Clang and */std:c++17* or */std:c++latest* for MSVC.
+:: <div class=note>In case of targeting C++20, give me a heads up of what compiler did you choose, so I can get one for myself.</div>
+
+In addition to one of the categories, you can opt out of implementing the type-based `value::is<>()` and `value::as<>()`. In fact, I strongly recommend first trying to mark the solution as e.g. **Futuristic, No classes** (or **Masochistic, Enums**, or something like that), writing enum-based versions first and only then trying to write class-based tools. When describing the `value` and various helper templates, I'll mark the class-based utilities as optional.
+
+## Project files ## {#cmake}
+
+To help you with the task, I've prepared a [GitHub project with CMake setup](https://github.com/mzdun/cxx-exercise). It has all the `CMakeLists.txt` files I think are needed, and then some &ndash; it already contains some tests for you to use. The `README.md` file describes the process of getting, building and running the code.
+
+### Layout and category selection ### {#cmake-layout}
+
+The place for the solution is in the `library` directory, with `library/include/json` subdir for headers and `library/src` subdir for code. Any files you might add must be also added to the `${LIBRARY_SOURCES}` variable on top of the `library/CMakeLists.txt` file.
+
+### Category selection ### {#cmake-category}
+
+In the same file you can also declare your category. To do that, locate a call to `set_target_properties` at the bottom of the file and update the value of the `CXX_STANDARD` property accordingly. It is pre-set to C++11, so you probably want to change that.
+
+<div class=note>
+According to [CMake documentation](https://cmake.org/cmake/help/v3.12/prop_tgt/CXX_STANDARD.html), C++20 support began with CMake 3.12. In case anyone wanted to set `CXX_STANDARD` to 20, I requested this CMake in the root `CMakeLists.txt`, under `cmake_minimum_required`.
+</div>
+
+The tests can grow with your code. You can select, which tests should be added by declaring, which library features your code supports. Flags controlling the test list are in the `tests\CMakeLists.txt` and they all start with `HAS_JSON_` and they all are set to `NO`. Optimistically, at the end of your work they will all switch to `YES`, with possible exception of `HAS_JSON_IS_CLASS` (*Does your class support val.is&lt;long&gt;(), etc.?*) and `HAS_JSON_AS_CLASS` (*Does your class support val.as&lt;short&gt;(), etc.?*).
+
+<div class=note>
+Leaving those two variables (`HAS_JSON_IS_CLASS` and `HAS_JSON_AS_CLASS`) set to `NO` will be enough to opt-out from type-based interfaces.
+</div>
+
+
+<!--
+      ██  ██████   ███████  ██    ██        ██████  ████████  ████████  ██████ 
+      ██ ██    ██ ██     ██ ███   ██       ██    ██ ██     ██ ██       ██    ██
+      ██ ██       ██     ██ ████  ██       ██       ██     ██ ██       ██      
+      ██  ██████  ██     ██ ██ ██ ██        ██████  ████████  ██████   ██      
+██    ██       ██ ██     ██ ██  ████             ██ ██        ██       ██      
+██    ██ ██    ██ ██     ██ ██   ███       ██    ██ ██        ██       ██    ██
+ ██████   ██████   ███████  ██    ██        ██████  ██        ████████  ██████ 
+-->
+
+# Simplified JSON format # {#json}
+
+A JSON document, as specified here, consists of a single *value*.
+
+## Value ## {#json-val}
+
+A *value* can be a *string* in double quotes, a *number*, an *array* or `null`.
+
+<pre class='railroad'>
+Seq:
+  N: whitespace
+  Choice:
+    N: string
+    N: number
+    N: array
+    T: null
+  N: whitespace
+</pre>
+
+*Whitespace* in grammar above marks a possible separator. It is either empty or consist of a sequence of one or more whitespace characters or (in C++ terms) `' '`, `'\n'`, `'\r'` or `'\t'`.
+
+<pre class='railroad'>
+Choice:
+  Skip:
+  Plus:
+    Choice:
+      N: U+0020
+      N: U+000A
+      N: U+000D
+      N: U+0009
+</pre>
+
+## String ## {#json-string}
+
+A *string* is a sequence of zero or more characters, except for a small set of forbidden characters. The characters forbidden in a string are: quote (`"`), line feed (`\n`) or carriage return (`\r`). Also, a backslash has no special meaning in this grammar.
+
+<pre class='railroad'>
+T: "
+Choice:
+  Skip:
+  Seq:
+    N: any ASCII character, except
+    Choice:
+      N: U+0022
+      N: U+000A
+      N: U+000D
+T: "
+</pre>
+
+## Number ## {#json-number}
+
+A *number* is a sequence of digits optionally prefixed by a `-`. This sequence is always interpreted as base-10 number, even if starting with a `0`.
+
+<pre class='railroad'>
+Choice:
+  Skip:
+  T: -
+Plus:
+  Choice:
+    T: 0
+    T: 1
+    T: 2
+    T: 3
+    T: 4
+    T: 5
+    T: 6
+    T: 7
+    T: 8
+    T: 9
+</pre>
+
+## Array ## {#json-array}
+
+An *array* is an ordered collection of values. An array begins with `[` (*left bracket*) and ends with `]` (*right bracket*). Values are separated by `,` (*comma*).
+
+<pre class='railroad'>
+T: [
+Choice:
+  Skip:
+  Plus:
+    N: value
+    T: ,
+T: ]
+</pre>
+
+## Differences to an actual JSON specification ## {#json-diff}
+
+The [full JSON specification](http://json.org/) contains features, which are *not* present in this specification. They were removed deliberately, so the participants can implement their solution in the time given.
+
+The removed features are:
+
+- boolean values `true` and `false`
+- objects
+- escape sequences, including UTF-16 codes in the string
+- floating-point part of a number
+- no insignificant zero in a number
+
+<!--
+████████     ███    ████████   ██████  ████████
+██     ██   ██ ██   ██     ██ ██    ██ ██      
+██     ██  ██   ██  ██     ██ ██       ██      
+████████  ██     ██ ████████   ██████  ██████  
+██        █████████ ██   ██         ██ ██      
+██        ██     ██ ██    ██  ██    ██ ██      
+██        ██     ██ ██     ██  ██████  ████████
+-->
+
+# C++ API # {#api}
+## `json::parse` ## {#parser}
+
+Converts an ASCII block into a [json::value](#value).
+
+<div class=example>
+An example function loading a json value from a file:
+
+```cpp
+json::value load(FILE* file) {
+  std::vector<char> contents;
+
+  char buffer[1024];
+  auto size = size_t{};
+  while (size = fread(buffer, 1, sizeof(buffer), file)) {
+    vector.insert(vector.end(), buffer, buffer + size);
+  }
+
+  try {
+    return json::parse(buffer.data(), buffer.size());
+  } catch(json::parser_error&) {
+    return json::value{};
+  }
+}
+
+```
+</div>
+
+### Header name ### {#parser-header}
+
+The actual header name is left to implementation. The function, however, must be accessible through
+
+```cpp
+#include <json/json.hh>
+```
+
+### Function synopsis ### {#parser-def}
+
+```cpp
+namespace json {
+  value parse(const char* buffer, size_t size);
+}
+```
+
+### Namespace members ### {#parser-members}
+: `parse(buffer, size)`
+:: Processes a buffer in order to extract the document value.
+:: **Throws**:
+:: - `json::empty_document` if the document only contained the *whitespace*.
+:: - `json::parser_error` if the buffer cannot be parsed.
+
+<!--
+      ██  ██████   ███████  ██    ██       ██     ██    ███    ██       ██     ██ ████████
+      ██ ██    ██ ██     ██ ███   ██       ██     ██   ██ ██   ██       ██     ██ ██      
+      ██ ██       ██     ██ ████  ██       ██     ██  ██   ██  ██       ██     ██ ██      
+      ██  ██████  ██     ██ ██ ██ ██       ██     ██ ██     ██ ██       ██     ██ ██████  
+██    ██       ██ ██     ██ ██  ████        ██   ██  █████████ ██       ██     ██ ██      
+██    ██ ██    ██ ██     ██ ██   ███         ██ ██   ██     ██ ██       ██     ██ ██      
+ ██████   ██████   ███████  ██    ██          ███    ██     ██ ████████  ███████  ████████
+-->
+
+## `json::value` ## {#value}
+
+Represents the value of the simplified JSON.
+
+### Header name ### {#value-header}
+
+The actual header name is left to implementation. The type, however, must be accessible through
+
+```cpp
+#include <json/json.hh>
+```
+
+### Class definition ### {#value-def}
+
+```cpp
+namespace json {
+  enum value_type {
+    JSON_NULL,
+    JSON_STRING,
+    JSON_NUMBER,
+    JSON_ARRAY
+  };
+
+  class value : /* unspecified */ {
+  public:
+    using array_type = std::vector<value>;
+
+    value() noexcept;
+    value(std::nullptr_t nil) noexcept;
+    value(const char* str);
+    value(std::string str) noexcept;
+    value(long long num) noexcept;
+    value(array_type seq) noexcept;
+
+    value(const value& oth);
+    value(value&& oth) noexcept;
+
+    value& operator=(const value& oth);
+    value& operator=(value&& oth) noexcept;
+
+    value_type get_type() const noexcept;
+
+    template <value_type TYPE>
+    bool is() const noexcept;
+
+    template <class StringOrArrayOrIntegral>
+    [[mzdun::optional]] bool is() const noexcept;
+
+    long long as_number() const;
+
+    const std::string& as_string() const &;
+    std::string as_string() &&;
+
+    const array_type& as_array() const &;
+    array_type as_array() &&;
+
+    /*
+     * return type for exposition only,
+     * see below for actual types required for this method
+     */
+    template <value_type TYPE>
+    traits::lvalue_by_enum_t<TYPE> as() const &;
+
+    /*
+     * return type for exposition only,
+     * see below for actual types required for this method
+     */
+    template <value_type TYPE>
+    traits::rvalue_by_enum_t<TYPE> as() &&;
+
+    /*
+     * return type for exposition only,
+     * see below for actual types required for this method
+     */
+    template <class StringOrArrayOrIntegral>
+    [[mzdun::optional]] traits::lvalue_by_type_t<StringOrArrayOrIntegral> as() const &;
+
+    /*
+     * return type for exposition only,
+     * see below for actual types required for this method
+     */
+    template <class StringOrArray>
+    [[mzdun::optional]] traits::rvalue_by_type_t<StringOrArray> as() &&;
+  };
+
+  using array = value::array_type;
+}
+```
+
+### Members ### {#value-members}
+
+: Types
+:: - `using array_type = std::vector<value>`
+:: Helper alias for the JSON array, used in constructors and accessors
+: Constructors and assignments
+:: - `value::value() noexcept`
+:: - `value::value(std::nullptr_t nil) noexcept`
+:: The default and `nullptr_t` constructors create a `null` JSON value. Neither are allowed to throw any exceptions.
+:: - `value(const char* str)`
+:: The `const char*` constructor creates a string JSON value. It may throw `std::bad_alloc` and any other exception a `std::string` constructor might throw.
+:: - `value(std::string str) noexcept`
+:: The `std::string` constructor also creates a string JSON value. It may not throw any exceptions.
+:: - `value(long long num) noexcept`
+:: The `long long` constructor creates a number JSON value. It may not throw any exceptions.
+:: - `value(array seq) noexcept`
+:: The `array` constructor creates an array JSON value. It may not throw any exceptions.
+:: - `value(const value& oth)`
+:: - `value& operator=(const value& oth)`
+:: Copy constructor and copy assignment create a deep clone of the value. It can therefore re-throw any exception a `std::string` or `std::vector` copy operations may throw.
+:: - `value(value&& oth) noexcept`
+:: - `value& operator=(value&& oth) noexcept`
+:: Move constructor and move assignment take the contents of their argument. It cannot throw any exception.
+: Type checking
+:: - `value_type get_type() const noexcept`
+:: - `template <value_type TYPE> bool is() const noexcept`
+:: - `template <class StringOrArrayOrIntegral> [[mzdun::optional]] bool is() const noexcept`
+:: The `get_type()` returns one of the `value_type`, representing the type of content of the value. The `is<TYPE>()` is equivalent to `get_type() == TYPE`. The `is<StringOrArrayOrIntegral>()`, if provided, guesses the right `value_type` to compare against `get_type()`. None are allowed to throw any exceptions.
+:: The `StringOrArrayOrIntegral` can be one of:
+:: - `std::string`,
+:: - `json::array`,
+:: - `long long`,
+:: - `long`,
+:: - `int` or
+:: - `short`
+: Extracting numbers
+:: - `long long as_number() const`
+:: - `template <value_type TYPE> /* see below */ as() const &`
+:: - `template <class StringOrArrayOrIntegral> [[mzdun::optional]] /* see below */ as() const &`
+:: The numbers can be extracted with one of `as_number()`, `as<json::JSON_NUMBER>()`, `as<long long>()`, `as<long>()`, `as<int>()` or `as<short>()`. First and second return a `long long`, others (if provided) return their template argument.
+:: All must throw a `not_a_number` if the value does not represent a number.
+: Extracting strings
+:: - `const std::string& as_string() const &`
+:: - `std::string as_string() &&`
+:: - `template <value_type TYPE> /* see below */ as() const &`
+:: - `template <value_type TYPE> /* see below */ as() &&`
+:: - `template <class StringOrArrayOrIntegral> [[mzdun::optional]] /* see below */ as() const &`
+:: - `template <class StringOrArray> [[mzdun::optional]] /* see below */ as() &&`
+:: The strings can be extracted with one of `as_string()`, `as<json::JSON_STRING>()` or (optionally) `as<std::string>()`. All have lvalue and rvalue versions. The former returns `const std::string&`, the latter returns `std::string`.
+:: All must throw a `not_a_string` if the value does not represent a string.
+: Extracting array
+:: - `const array& as_array() const &`
+:: - `array as_array() &&`
+:: - `template <value_type TYPE> /* see below */ as() const &`
+:: - `template <value_type TYPE> /* see below */ as() &&`
+:: - `template <class StringOrArrayOrIntegral> [[mzdun::optional]] /* see below */ as() const &`
+:: - `template <class StringOrArray> [[mzdun::optional]] /* see below */ as() &&`
+:: The strings can be extracted with one of `as_array()`, `as<json::JSON_ARRAY>()` or (optionally) `as<json::array>()`. All have lvalue and rvalue versions. The former returns `const array&`, the latter returns `array`.
+:: All must throw a `not_an_array` if the value does not represent an array.
+
+### Namespace members ### {#json-members}
+
+: Types
+:: - `using array = value::array_type`
+:: An alias allowing easier invocation of type versions of `value::is<>()` and `value::as<>()`. Think `obj.is<json::array>()` instead of `obj.is<json::value::array_type>()` or even `obj.is<std::vector<json::value>>()`.
+: Enums
+:: - `enum value_type`
+:: Returned from `value::get_type()`, to indicate the kind of JSON value is held by an object. It is also used by the non-type version of `value::is<>()` and `value::as<>()`.
+
+<!--
+██     ██ ████████ ████████    ███    ████████  ████████   ███████   ██████   ████████     ███    ██     ██  ██████ 
+███   ███ ██          ██      ██ ██   ██     ██ ██     ██ ██     ██ ██    ██  ██     ██   ██ ██   ███   ███ ██    ██
+████ ████ ██          ██     ██   ██  ██     ██ ██     ██ ██     ██ ██        ██     ██  ██   ██  ████ ████ ██      
+██ ███ ██ ██████      ██    ██     ██ ████████  ████████  ██     ██ ██   ████ ████████  ██     ██ ██ ███ ██  ██████ 
+██     ██ ██          ██    █████████ ██        ██   ██   ██     ██ ██    ██  ██   ██   █████████ ██     ██       ██
+██     ██ ██          ██    ██     ██ ██        ██    ██  ██     ██ ██    ██  ██    ██  ██     ██ ██     ██ ██    ██
+██     ██ ████████    ██    ██     ██ ██        ██     ██  ███████   ██████   ██     ██ ██     ██ ██     ██  ██████ 
+-->
+
+## Metaprograms ## {#meta}
+
+This chapter is only informational. Any implementation of this spec MAY use this information, but it is also free to provide its own details.
+
+### Header names ### {#meta-header}
+
+The actual header names are left to implementation. Those aliases and classes, if at all present, are not to be referenced by library users.
+
+### Class definitions ### {#meta-def}
+
+```cpp
+namespace json::traits {
+  template <typename Arg>
+  [[mzdun::optional]] constexpr bool type_to_value_type_v = /* unspecified */;
+
+  template <value_type TYPE>
+  using lvalue_by_enum_t = /* unspecified */;
+
+  template <value_type TYPE>
+  using rvalue_by_enum_t = /* unspecified */;
+
+  template <value_type TYPE> struct by_enum;
+
+  template <typename StringOrArrayOrIntegral>
+  [[mzdun::optional]] using lvalue_by_type_t = /* unspecified */;
+
+  template <typename StringOrArray>
+  [[mzdun::optional]] using rvalue_by_type_t = /* unspecified */;
+
+  template <typename StringOrArrayOrIntegral, typename = void>
+  [[mzdun::optional]] struct by_type;
+}
+```
+### Members ### {#meta-members}
+
+: `[[mzdun::optional]] type_to_value_type_v<class>`
+:: Helper metaprogram (*variable template*, available only in C++14 and later) finding a `value_type` for a given type name. Allows to map type operations to (simpler) enum operations:
+
+<table>
+  <thead>
+    <tr><td>Argument</td><td><code>type_to_value_type</code></td></tr>
+  </thead>
+    <tr><td><code>std::string</code></td><td><code>JSON_STRING</code></td></tr>
+    <tr><td><code>json::array</code></td><td><code>JSON_ARRAY</code></td></tr>
+    <tr><td><code>long long</code></td><td><code>JSON_NUMBER</code></td></tr>
+    <tr><td><code>long</code></td><td><code>JSON_NUMBER</code></td></tr>
+    <tr><td><code>int</code></td><td><code>JSON_NUMBER</code></td></tr>
+    <tr><td><code>short</code></td><td><code>JSON_NUMBER</code></td></tr>
+</table>
+
+: `lvalue_by_enum_t<value_type>` and `rvalue_by_enum_t<value_type>`
+:: Helper metaprograms (*typedef templates*) establishing return types for both `as<value_type>()` method templates. The programs should evaluate to:
+
+<table>
+  <thead>
+    <tr><td>Argument</td><td><code>lvalue_by_enum_t</code></td><td><code>rvalue_by_enum_t</code></td></tr>
+  </thead>
+    <tr><td><code>JSON_NULL</code></td><td>--</td><td>--</tr>
+    <tr><td><code>JSON_NUMBER</code></td><td><code>long long</code></td><td>--</td></tr>
+    <tr><td><code>JSON_STRING</code></td><td><code>const std::string&</code></td><td><code>std::string</code></td></tr>
+    <tr><td><code>JSON_ARRAY</code></td><td><code>const json::array&</code></td><td><code>json::array</code></td></tr>
+</table>
+
+: `by_enum<value_type>`
+:: Helper metapgrogram (*class template*) aiding in implementation of both versions of `as<value_type>()` method templates. All provided versions have a `static lvalue_by_enum_t<ARGUMENT> lvalue(const value&)` method. The `JSON_STRING` and `JSON_ARRAY` versions have additional `static rvalue_by_enum_t<ARGUMENT> rvalue(value&&)` method.
+
+<div class=note>
+If the `by_type<class>` is provided, then the `by_enum<value_type>` can be implemented in terms of `by_type<class>`:
+
+```cpp
+template <value_type> struct by_enum;
+template <> struct by_enum<JSON_NUMBER> : by_type<long long> {};
+template <> struct by_enum<JSON_STRING> : by_type<std::string> {};
+template <> struct by_enum<JSON_ARRAY> : by_type<std::vector<value>> {};
+```
+
+Otherwise, the chicken-and-egg problem described in the `by_type<class>` also concerns implementations of `by_enum<value_type>`.
+</div>
+
+<div class=note>**Hint**: Thanks to the fact, that `lvalue_by_enum_t<value_type>` and `rvalue_by_enum_t<value_type>` heavily limits the number of possible `value_type` arguments, the `as<value_type>()` method can be implemented much easier, without `by_enum<value_type>`.</div>
+
+: `[[mzdun::optional]] lvalue_by_type_t<class>`
+:: Helper metaprogram (*typedef template*) establishing return type for `as<class>() const&` method template. For `std::string` and `json::array` equivalent to `lvalue_by_enum_t<type_to_value_type_v<ARGUMENT>>`, for integer types (`long long`, `long`, `int`, `short`) equivalent to its argument.
+: `[[mzdun::optional]] rvalue_by_type_t<class>`
+:: Helper metaprogram (*typedef template*) establishing return type for `as<class>() &&` method template. Equivalent to `rvalue_by_enum_t<type_to_value_type_v<ARGUMENT>>`.
+: `[[mzdun::optional]] by_type<class>`
+:: Helper metapgrogram (*class template*) aiding in implementation of both versions of `as<class>()` method templates. All provided versions have a `static lvalue_by_type_t<ARGUMENT> lvalue(const value&)` method. The string and array versions have additional `static rvalue_by_type_t<ARGUMENT> rvalue(value&&)` method.
+
+<div class=note>
+There is a slight chicken-and-egg problem here. Those metaprograms are used by the `json::value` and themselves also use the type. One possible solution is to declare the `json::value` and the methods using the type and implement the methods after the definition of `json::value` is available.
+
+```cpp
+namespace json {
+  class value;
+}
+
+namespace json::traits {
+  template <>
+  struct by_type<std::string>
+  {
+    static std::string const& lvalue(const value& v);
+    static std::string rvalue(value&& v);
+  };
+}
+
+// definition of json::value here...
+
+namespace json::traits {
+  inline std::string const& by_type<std::string>::lvalue(const value& lval)
+  {
+    return lval.as_string();
+  }
+
+  inline std::string by_type<std::string>::rvalue(value&& rval)
+  {
+    return std::move(rval).as_string();
+  }
+}
+```
+</div>
+
+<div class=note>
+**Hint**: Thanks to the fact, that `lvalue_by_type_t<class>` and `rvalue_by_type_t<class>` heavily limits the number of possible `class` arguments, the `as<class>()` method can be implemented much easier, without `by_type<class>`.
+</div>
+
+<!--
+████████ ██     ██  ██████  ████████ ████████  ████████ ████  ███████  ██    ██  ██████ 
+██        ██   ██  ██    ██ ██       ██     ██    ██     ██  ██     ██ ███   ██ ██    ██
+██         ██ ██   ██       ██       ██     ██    ██     ██  ██     ██ ████  ██ ██      
+██████      ███    ██       ██████   ████████     ██     ██  ██     ██ ██ ██ ██  ██████ 
+██         ██ ██   ██       ██       ██           ██     ██  ██     ██ ██  ████       ██
+██        ██   ██  ██    ██ ██       ██           ██     ██  ██     ██ ██   ███ ██    ██
+████████ ██     ██  ██████  ████████ ██           ██    ████  ███████  ██    ██  ██████ 
+-->
+
+## Exceptions ## {#ex}
+
+: `parser_error`
+:: Runtime exception representing problems of a [parser](#parser).
+: `empty_document`
+:: A `parser_error` used, when the parsed document is empty.
+: `bad_cast`
+:: Runtime exception and a base of all casting exceptions.
+: `not_a_string`
+:: Objects of this class are thrown by `value::as_string()`, when the `value` does not represent a string.
+: `not_a_number`
+:: Objects of this class are thrown by `value::as_number()`, when the `value` does not represent a number.
+: `not_an_array`
+:: Objects of this class are thrown by `value::as_number()`, when the `value` does not represent an array.
+
+### Header names ### {#ex-header}
+
+The actual header names are left to implementation. Each type, however, must be accessible through
+
+```cpp
+#include <json/json.hh>
+```
+
+### Class definitions ### {#ex-def}
+
+```cpp
+namespace json {
+  class parser_error : public std::runtime_error { /* unspecified */ };
+  class empty_document : public parser_error { /* unspecified */ };
+  class bad_cast : public std::runtime_error { /* unspecified */ };
+  class not_a_string : public bad_cast { /* unspecified */ };
+  class not_a_number : public bad_cast { /* unspecified */ };
+  class not_an_array : public bad_cast { /* unspecified */ };
+}
+```
+### Members ### {#ex-members}
+
+: Constructors
+:: Since the objects of the class are to be initialized by the implementation itself, the details of the constructors are unspecified and left to the implementation. However, the classes should provide enough support for all the leaf types to be recognized by users through `std::exception::what()` (see [the cppreference](https://en.cppreference.com/w/cpp/error/runtime_error) for more information).
