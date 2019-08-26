@@ -93,6 +93,8 @@ In the same file you can also declare your category. To do that, locate a call t
 
 <div class=note>
 According to [CMake documentation](https://cmake.org/cmake/help/v3.12/prop_tgt/CXX_STANDARD.html), C++20 support began with CMake 3.12. In case anyone wanted to set `CXX_STANDARD` to 20, I requested this CMake in the root `CMakeLists.txt`, under `cmake_minimum_required`.
+
+If you do not have that version and do not want to go through installing it on systems, like Ubuntu 18.04, you can downgrade to something earlier. For instance, CMake 3.10 has support for setting `CXX_STANDARD` to 17 and that one should be on Ubuntu 18.04...
 </div>
 
 The tests can grow with your code. You can select, which tests should be added by declaring, which library features your code supports. Flags controlling the test list are in the `tests\CMakeLists.txt` and they all start with `HAS_JSON_` and they all are set to `NO`. Optimistically, at the end of your work they will all switch to `YES`, with possible exception of `HAS_JSON_IS_CLASS` (*Does your class support val.is&lt;long&gt;(), etc.?*) and `HAS_JSON_AS_CLASS` (*Does your class support val.as&lt;short&gt;(), etc.?*).

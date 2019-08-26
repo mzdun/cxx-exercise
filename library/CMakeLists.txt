@@ -7,5 +7,8 @@ set(LIBRARY_SOURCES
 
 add_library(json ${LIBRARY_SOURCES})
 target_include_directories(json PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_options(json PRIVATE ${ADDITIONAL_WALL_FLAGS})
 set_target_properties(json PROPERTIES CXX_STANDARD 11) # Modify as needed
+
+# this line is optional, but highly advised, for more information see
+# https://github.com/lefticus/cppbestpractices/blob/master/02-Use_the_Tools_Available.md
+target_compile_options(json PRIVATE ${ADDITIONAL_WALL_FLAGS})
